@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>逃げけん制が「条件による不発動」になる理由｜調査メモ</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Kaisei+Decol:wght@500;700&family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --turf: #1f6b45;
+    --turf-deep: #0f3d28;
+    --dirt: #8b5a2b;
+    --sand: #e8d5b5;
+    --ink: #1a1714;
+    --muted: #5c534a;
+    --paper: #f7f1e6;
+    --paper-2: #fffaf2;
+    --gold: #c4a35a;
+    --alert: #b5402a;
+    --ok: #2a7a4b;
+    --line: rgba(26, 23, 20, 0.12);
+    --shadow: 0 18px 50px rgba(15, 61, 40, 0.12);
+  }
+
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    color: var(--ink);
+    font-family: "Zen Kaku Gothic New", "Hiragino Sans", sans-serif;
+    background:
+      radial-gradient(1200px 600px at 10% -10%, rgba(196, 163, 90, 0.22), transparent 55%),
+      radial-gradient(900px 500px at 100% 0%, rgba(31, 107, 69, 0.18), transparent 50%),
+      linear-gradient(180deg, #efe6d5 0%, var(--paper) 28%, #f3ebe0 100%);
+    line-height: 1.75;
+  }
+
+  body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    pointer-events: none;
+    opacity: 0.035;
+    background-image:
+      repeating-linear-gradient(
+        -12deg,
+        transparent 0 14px,
+        rgba(26, 23, 20, 0.55) 14px 15px
+      );
+    z-index: 0;
+  }
+
+  .wrap {
+    position: relative;
+    z-index: 1;
+    width: min(920px, calc(100% - 2rem));
+    margin: 0 auto;
+    padding: 2.5rem 0 4rem;
+  }
+
+  .hero {
+    position: relative;
+    overflow: hidden;
+    border-radius: 28px;
+    padding: 2.4rem 2rem 2rem;
+    color: #f8f4ec;
+    background:
+      linear-gradient(135deg, rgba(15, 61, 40, 0.92), rgba(31, 107, 69, 0.88)),
+      url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160' viewBox='0 0 160 160'%3E%3Cpath fill='%23ffffff' fill-opacity='0.05' d='M0 80h160M80 0v160'/%3E%3C/svg%3E");
+    box-shadow: var(--shadow);
+    animation: rise 0.8s ease both;
+  }
+
+  .hero::after {
+    content: "";
+    position: absolute;
+    right: -40px;
+    bottom: -50px;
+    width: 220px;
+    height: 220px;
+    border-radius: 50%;
+    background: radial-gradient(circle, rgba(196,163,90,0.35), transparent 70%);
+  }
+
+  .kicker {
+    display: inline-block;
+    font-size: 0.78rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--sand);
+    border: 1px solid rgba(232, 213, 181, 0.35);
+    border-radius: 999px;
+    padding: 0.28rem 0.8rem;
+    margin-bottom: 1rem;
+  }
+
+  h1, h2, h3 {
+    font-family: "Kaisei Decol", "Hiragino Mincho ProN", serif;
+    font-weight: 700;
+    line-height: 1.35;
+    letter-spacing: 0.02em;
+  }
+
+  .hero h1 {
+    margin: 0 0 0.8rem;
+    font-size: clamp(1.7rem, 4.4vw, 2.45rem);
+    max-width: 16em;
+  }
+
+  .hero p {
+    margin: 0;
+    max-width: 36em;
+    color: rgba(248, 244, 236, 0.9);
+    font-size: 1.02rem;
+  }
+
+  .toc {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.55rem;
+    margin: 1.4rem 0 0;
+  }
+
+  .toc a {
+    color: #fff8ea;
+    text-decoration: none;
+    font-size: 0.88rem;
+    background: rgba(255,255,255,0.08);
+    border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 999px;
+    padding: 0.35rem 0.75rem;
+    transition: background 0.2s ease, transform 0.2s ease;
+  }
+  .toc a:hover { background: rgba(255,255,255,0.16); transform: translateY(-1px); }
+
+  section {
+    margin-top: 2rem;
+    animation: rise 0.7s ease both;
+  }
+  section:nth-of-type(2) { animation-delay: 0.05s; }
+  section:nth-of-type(3) { animation-delay: 0.1s; }
+  section:nth-of-type(4) { animation-delay: 0.15s; }
+
+  .panel {
+    background: var(--paper-2);
+    border: 1px solid var(--line);
+    border-radius: 22px;
+    padding: 1.5rem 1.4rem;
+    box-shadow: 0 10px 30px rgba(26, 23, 20, 0.04);
+  }
+
+  .verdict {
+    display: grid;
+    gap: 1rem;
+    grid-template-columns: 1.2fr 0.8fr;
+    align-items: stretch;
+  }
+
+  .verdict-main h2 { margin: 0 0 0.7rem; font-size: 1.45rem; }
+  .verdict-main p { margin: 0 0 0.8rem; color: var(--muted); }
+  .verdict-main p:last-child { margin-bottom: 0; }
+
+  .stamp {
+    display: grid;
+    place-items: center;
+    text-align: center;
+    border-radius: 18px;
+    padding: 1.2rem;
+    background:
+      linear-gradient(160deg, rgba(181, 64, 42, 0.08), rgba(196, 163, 90, 0.12)),
+      #fff;
+    border: 2px dashed rgba(181, 64, 42, 0.35);
+  }
+  .stamp strong {
+    display: block;
+    font-family: "Kaisei Decol", serif;
+    font-size: 1.25rem;
+    color: var(--alert);
+    margin-bottom: 0.35rem;
+  }
+  .stamp span { color: var(--muted); font-size: 0.92rem; }
+
+  .conditions {
+    display: grid;
+    gap: 0.9rem;
+  }
+
+  .cond {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: 0.95rem;
+    align-items: start;
+    padding: 1rem 1rem 1rem 0.9rem;
+    border-radius: 18px;
+    background: #fff;
+    border: 1px solid var(--line);
+    transition: transform 0.25s ease, box-shadow 0.25s ease;
+  }
+  .cond:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(15,61,40,0.08); }
+
+  .badge {
+    width: 2.4rem;
+    height: 2.4rem;
+    border-radius: 50%;
+    display: grid;
+    place-items: center;
+    font-weight: 700;
+    color: #fff;
+    background: var(--turf);
+    box-shadow: inset 0 -2px 0 rgba(0,0,0,0.15);
+  }
+  .cond:nth-child(2) .badge { background: var(--dirt); }
+  .cond:nth-child(3) .badge { background: #3d5a80; }
+
+  .cond h3 { margin: 0 0 0.25rem; font-size: 1.12rem; }
+  .cond .code {
+    display: inline-block;
+    margin: 0.25rem 0 0.5rem;
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size: 0.82rem;
+    color: #234;
+    background: #eef3ea;
+    border-radius: 8px;
+    padding: 0.18rem 0.45rem;
+    word-break: break-all;
+  }
+  .cond p { margin: 0; color: var(--muted); font-size: 0.96rem; }
+
+  .flow {
+    display: grid;
+    gap: 0.75rem;
+  }
+  .flow-step {
+    display: grid;
+    grid-template-columns: 2.2rem 1fr;
+    gap: 0.8rem;
+    align-items: start;
+  }
+  .flow-num {
+    width: 2.2rem;
+    height: 2.2rem;
+    border-radius: 10px;
+    display: grid;
+    place-items: center;
+    background: var(--turf-deep);
+    color: #fff;
+    font-weight: 700;
+  }
+  .flow-step p { margin: 0.15rem 0 0; color: var(--muted); }
+
+  .timeline-wrap { margin-top: 1rem; }
+  .timeline {
+    position: relative;
+    border-radius: 18px;
+    overflow: hidden;
+    background: linear-gradient(90deg, #d9c4a0 0%, #c9b189 18%, #6faf7d 18%, #4f9163 100%);
+    min-height: 150px;
+    border: 1px solid rgba(0,0,0,0.08);
+  }
+  .timeline-track {
+    position: absolute;
+    left: 4%;
+    right: 4%;
+    top: 58%;
+    height: 8px;
+    border-radius: 999px;
+    background: rgba(26,23,20,0.35);
+  }
+  .marker {
+    position: absolute;
+    top: 18%;
+    transform: translateX(-50%);
+    text-align: center;
+    width: max-content;
+  }
+  .marker .pin {
+    width: 14px;
+    height: 14px;
+    margin: 0 auto 0.35rem;
+    border-radius: 50%;
+    background: #fff;
+    border: 3px solid var(--alert);
+    animation: pulse 2.2s ease-in-out infinite;
+  }
+  .marker.ok .pin { border-color: var(--ok); animation: none; }
+  .marker .label {
+    font-size: 0.78rem;
+    font-weight: 700;
+    background: rgba(255,255,255,0.92);
+    border-radius: 8px;
+    padding: 0.2rem 0.45rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+  }
+  .marker.fail { left: 11%; }
+  .marker.five { left: 28%; }
+  .marker.ok { left: 62%; }
+  .phase-label {
+    position: absolute;
+    left: 4%;
+    top: 78%;
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: #143;
+    background: rgba(255,255,255,0.75);
+    padding: 0.15rem 0.5rem;
+    border-radius: 999px;
+  }
+  .caption {
+    margin: 0.7rem 0 0;
+    color: var(--muted);
+    font-size: 0.92rem;
+  }
+
+  .case {
+    display: grid;
+    gap: 0.8rem;
+    grid-template-columns: 1fr 1fr;
+  }
+  .case-box {
+    border-radius: 16px;
+    padding: 1rem;
+    background: #fff;
+    border: 1px solid var(--line);
+  }
+  .case-box h3 { margin: 0 0 0.4rem; font-size: 1.05rem; }
+  .case-box.bad { border-color: rgba(181,64,42,0.35); background: #fff7f4; }
+  .case-box.good { border-color: rgba(42,122,75,0.35); background: #f3faf5; }
+  .case-box p { margin: 0; color: var(--muted); font-size: 0.94rem; }
+
+  .evidence {
+    display: grid;
+    gap: 1rem;
+  }
+  .ev {
+    border-radius: 18px;
+    overflow: hidden;
+    border: 1px solid var(--line);
+    background: #14110f;
+    color: #e9e2d6;
+  }
+  .ev-head {
+    display: flex;
+    justify-content: space-between;
+    gap: 1rem;
+    align-items: center;
+    padding: 0.7rem 1rem;
+    background: #221c18;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    font-size: 0.86rem;
+  }
+  .ev-head strong { color: var(--gold); font-weight: 700; }
+  .ev-body {
+    padding: 1rem;
+    font-family: ui-monospace, "Cascadia Mono", Consolas, monospace;
+    font-size: 0.84rem;
+    line-height: 1.65;
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+  .ev-body .hi { color: #9be7b0; }
+  .ev-body .dim { color: #9a9084; }
+  .ev-note {
+    margin: 0;
+    padding: 0.85rem 1rem 1rem;
+    background: #1b1714;
+    color: #cfc4b5;
+    font-family: "Zen Kaku Gothic New", sans-serif;
+    font-size: 0.9rem;
+    border-top: 1px solid rgba(255,255,255,0.05);
+  }
+
+  .quote {
+    margin: 0;
+    padding: 1rem 1.1rem;
+    border-left: 4px solid var(--gold);
+    background: #fff;
+    border-radius: 0 14px 14px 0;
+    color: var(--muted);
+  }
+  .quote cite {
+    display: block;
+    margin-top: 0.6rem;
+    font-style: normal;
+    font-size: 0.85rem;
+    color: #7a6f63;
+  }
+
+  .faq details {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 0.85rem 1rem;
+    margin-bottom: 0.7rem;
+  }
+  .faq summary {
+    cursor: pointer;
+    font-weight: 700;
+    list-style: none;
+  }
+  .faq summary::-webkit-details-marker { display: none; }
+  .faq summary::before {
+    content: "Q";
+    display: inline-grid;
+    place-items: center;
+    width: 1.4rem;
+    height: 1.4rem;
+    margin-right: 0.5rem;
+    border-radius: 6px;
+    background: var(--turf);
+    color: #fff;
+    font-size: 0.78rem;
+  }
+  .faq details p {
+    margin: 0.7rem 0 0;
+    color: var(--muted);
+  }
+
+  .draft {
+    background: #fff;
+    border: 1px dashed rgba(139, 90, 43, 0.45);
+    border-radius: 18px;
+    padding: 1.2rem 1.1rem;
+  }
+  .draft pre {
+    margin: 0;
+    white-space: pre-wrap;
+    font-family: "Zen Kaku Gothic New", sans-serif;
+    font-size: 0.95rem;
+    line-height: 1.8;
+    color: var(--ink);
+  }
+
+  .sources a {
+    color: var(--turf-deep);
+    font-weight: 500;
+  }
+  .sources ul { padding-left: 1.2rem; color: var(--muted); }
+  .sources li { margin-bottom: 0.45rem; }
+
+  footer {
+    margin-top: 2.2rem;
+    color: var(--muted);
+    font-size: 0.85rem;
+    text-align: center;
+  }
+
+  @keyframes rise {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: none; }
+  }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 0 rgba(181,64,42,0.45); }
+    50% { box-shadow: 0 0 0 8px rgba(181,64,42,0); }
+  }
+
+  @media (max-width: 760px) {
+    .verdict, .case { grid-template-columns: 1fr; }
+    .hero { padding: 1.7rem 1.2rem; }
+    .panel { padding: 1.15rem 1rem; }
+    .marker .label { font-size: 0.7rem; }
+  }
+</style>
+</head>
+<body>
+  <div class="wrap">
+    <header class="hero">
+      <div class="kicker">ルームマッチ調査メモ / 非エンジニア向け</div>
+      <h1>逃げけん制が<br>「条件による不発動」になる理由</h1>
+      <p>
+        U-toolsなどでは「逃げがいれば発動しそう」に見えますが、
+        PC版の正本データ <strong>master.mdb</strong> を確認すると、条件は3つあります。
+        このページは、その調査結果を掲示板共有用にまとめたものです。
+      </p>
+      <nav class="toc" aria-label="目次">
+        <a href="#summary">ひとことで</a>
+        <a href="#conditions">3つの条件</a>
+        <a href="#why">今回の読み</a>
+        <a href="#how">判定の流れ</a>
+        <a href="#evidence">証拠</a>
+        <a href="#faq">よくある疑問</a>
+      </nav>
+    </header>
+
+    <section id="summary" class="verdict">
+      <div class="panel verdict-main">
+        <h2>ひとことで言うと</h2>
+        <p>
+          <strong>逃げけん制</strong>は「逃げがいるだけ」では発動しません。
+          自分以外の逃げがいることに加えて、
+          <strong>序盤のランダムな地点</strong>で判定が立ち、
+          しかもその瞬間に<strong>開始から5秒以上</strong>経っている必要があります。
+        </p>
+        <p>
+          今回のように逃げが複数いても「条件による不発動」になるのは、
+          確率ハズレではなく、
+          <strong>判定地点が早すぎて「5秒以上」を満たせなかった</strong>
+          可能性が高い、という整理です。
+        </p>
+      </div>
+      <div class="stamp" aria-label="結論スタンプ">
+        <div>
+          <strong>確率ではなく条件</strong>
+          <span>序盤ランダム地点 × 経過5秒<br>の組み合わせが原因候補</span>
+        </div>
+      </div>
+    </section>
+
+    <section id="conditions">
+      <div class="panel">
+        <h2 style="margin-top:0">発動に必要な3条件（全部必要）</h2>
+        <p style="color:var(--muted); margin-top:0.3rem">
+          master.mdb の <code>condition_1</code> には、次の文字列が入っています。
+        </p>
+        <p class="code" style="
+          font-family:ui-monospace,Consolas,monospace;
+          background:#eef3ea;
+          border-radius:12px;
+          padding:0.7rem 0.85rem;
+          word-break:break-all;
+          font-size:0.86rem;">
+          running_style_count_nige_otherself&gt;=1&amp;phase_random==0&amp;accumulatetime&gt;=5
+        </p>
+        <div class="conditions" style="margin-top:1rem">
+          <article class="cond">
+            <div class="badge">①</div>
+            <div>
+              <h3>自分以外の逃げが1人以上</h3>
+              <div class="code">running_style_count_nige_otherself&gt;=1</div>
+              <p>
+                「逃げが出走している」ではなく、<strong>自分を除いた逃げ</strong>の人数です。
+                今回は逃げ合計4人なので、この条件は満たせます。
+              </p>
+            </div>
+          </article>
+          <article class="cond">
+            <div class="badge">②</div>
+            <div>
+              <h3>序盤のどこか1点で判定</h3>
+              <div class="code">phase_random==0</div>
+              <p>
+                レース前に、序盤区間の中からランダムな地点（約10mぶん）が選ばれます。
+                その地点を通過したときに、ほかの条件もまとめてチェックされます。
+              </p>
+            </div>
+          </article>
+          <article class="cond">
+            <div class="badge">③</div>
+            <div>
+              <h3>開始から5秒以上経過</h3>
+              <div class="code">accumulatetime&gt;=5</div>
+              <p>
+                判定地点に来た瞬間、まだスタートから5秒未満だと、
+                この条件だけが偽になり<strong>条件不成立</strong>になります。
+              </p>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="why">
+      <div class="panel">
+        <h2 style="margin-top:0">今回のケースの読み方</h2>
+        <div class="case" style="margin-top:1rem">
+          <div class="case-box good">
+            <h3>確認できたこと</h3>
+            <p>逃げは合計4人。①は達成済みと判断できる。</p>
+          </div>
+          <div class="case-box bad">
+            <h3>起きた表示</h3>
+            <p>「スキルの条件による不発動」。確率ハズレではなく、条件側で落ちた表示。</p>
+          </div>
+        </div>
+        <p style="margin:1rem 0 0; color:var(--muted)">
+          したがって、いちばん自然な説明は次です。<br>
+          <strong>②のランダム判定地点が、開始5秒より前の位置に当たり、③を満たせなかった。</strong>
+        </p>
+        <p style="margin:0.7rem 0 0; color:var(--muted)">
+          なお、距離条件（逃げとの差、先頭逃げとの距離など）は
+          master.mdb の条件文には<strong>入っていません</strong>。
+        </p>
+      </div>
+    </section>
+
+    <section id="how">
+      <div class="panel">
+        <h2 style="margin-top:0">判定はどんな順番で進む？</h2>
+        <div class="flow" style="margin-top:1rem">
+          <div class="flow-step">
+            <div class="flow-num">1</div>
+            <div>
+              <strong>レース開始前</strong>
+              <p>序盤の中から「ここで判定する」地点をランダムに1つ決める。</p>
+            </div>
+          </div>
+          <div class="flow-step">
+            <div class="flow-num">2</div>
+            <div>
+              <strong>その地点を通過した瞬間</strong>
+              <p>①逃げ人数、③経過時間などをまとめてチェック。</p>
+            </div>
+          </div>
+          <div class="flow-step">
+            <div class="flow-num">3</div>
+            <div>
+              <strong>条件OKなら確率判定へ / NGなら条件不成立</strong>
+              <p>ここが「条件による不発動」と「確率で不発」の分かれ目です。</p>
+            </div>
+          </div>
+        </div>
+
+        <div class="timeline-wrap">
+          <div class="timeline" role="img" aria-label="序盤タイムラインのイメージ図">
+            <div class="timeline-track"></div>
+            <div class="marker fail">
+              <div class="pin"></div>
+              <div class="label">早すぎる判定地点<br>→ ③が偽 → 条件不成立</div>
+            </div>
+            <div class="marker five ok">
+              <div class="pin"></div>
+              <div class="label">経過5秒ライン</div>
+            </div>
+            <div class="marker ok">
+              <div class="pin"></div>
+              <div class="label">遅い判定地点<br>→ ③もOK → 確率へ</div>
+            </div>
+            <div class="phase-label">序盤（phase 0）のイメージ</div>
+          </div>
+          <p class="caption">
+            ※図は理解用のイメージです。実際の地点は距離ベースで抽選され、その地点通過時の経過時間が③と比較されます。
+          </p>
+        </div>
+      </div>
+    </section>
+
+    <section id="evidence">
+      <div class="panel">
+        <h2 style="margin-top:0">証拠になるもの</h2>
+        <p style="color:var(--muted); margin-top:0.25rem">
+          「推測」ではなく、手元のPC版データと公開資料から辿れる根拠です。
+        </p>
+
+        <div class="evidence" style="margin-top:1rem">
+          <article class="ev">
+            <div class="ev-head">
+              <strong>証拠1｜master.mdb（正本）</strong>
+              <span>skill_data / id=200831</span>
+            </div>
+            <div class="ev-body"><span class="dim">-- 再現用SQL</span>
+SELECT id, precondition_1, condition_1
+FROM skill_data
+WHERE id = 200831;
+
+<span class="dim">-- 取得結果</span>
+id              = <span class="hi">200831</span>
+precondition_1  = <span class="hi">(空)</span>
+condition_1     = <span class="hi">running_style_count_nige_otherself&gt;=1&amp;phase_random==0&amp;accumulatetime&gt;=5</span>
+
+<span class="dim">-- 名称 / 説明（text_data）</span>
+category 47 : 逃げけん制
+category 48 : レース序盤に作戦・逃げのウマ娘をけん制してわずかに疲れやすくする</div>
+            <p class="ev-note">
+              場所の目安：Steam版なら
+              <code>UmamusumePrettyDerby_Jpn_Data\Persistent\master\master.mdb</code>
+              。DBブラウザ等で上記SQLを実行すると同じ結果が確認できます。
+            </p>
+          </article>
+
+          <article class="ev">
+            <div class="ev-head">
+              <strong>証拠2｜同系統スキルも同じ型</strong>
+              <span>けん制4種</span>
+            </div>
+            <div class="ev-body">逃げけん制   ...&amp;phase_random==0&amp;accumulatetime&gt;=5
+先行けん制   ...&amp;phase_random==0&amp;accumulatetime&gt;=5
+差しけん制   ...&amp;phase_random==0&amp;accumulatetime&gt;=5
+追込けん制   ...&amp;phase_random==0&amp;accumulatetime&gt;=5
+
+<span class="dim">※中盤の「逃げ焦り」や終盤の「逃げためらい」には accumulatetime が付いていません。
+　序盤けん制だけ「早すぎる地点」を弾く設計だと読むのが自然です。</span></div>
+            <p class="ev-note">単独スキルの例外ではなく、序盤けん制シリーズ共通の書き方です。</p>
+          </article>
+
+          <blockquote class="quote">
+            ランダム発動スキルは、レース前に範囲内から約10mの地点を選び、
+            <strong>その地点にいるときに他の条件もすべて満たせば</strong>発動する。
+            <cite>
+              出典：Uma Musume Race Mechanics（コミュニティ解析ドキュメント）
+              / x_random の説明
+            </cite>
+          </blockquote>
+
+          <blockquote class="quote">
+            <code>phase_random==0</code> と <code>accumulatetime</code> が同時にあるスキルは、
+            <strong>チェック地点がレース序盤すぎて、まだ必要秒数に達していない</strong>
+            ことがあり、その場合は発動できない。
+            <cite>
+              出典：umareference / UmaGuide（スキル条件の解説）
+            </cite>
+          </blockquote>
+
+          <article class="ev">
+            <div class="ev-head">
+              <strong>証拠3｜公開シミュの実装コメント</strong>
+              <span>alpha123/uma-skill-tools</span>
+            </div>
+            <div class="ev-body"><span class="dim">// 要約（ActivationConditions.ts）</span>
+・accumulatetime は「地点に来たあとに見る動的条件」
+・phase_random と組み合わさるスキルでは、
+　開始直後の区間を抽選対象から外さない
+・理由：外すと <span class="hi">本家より不発が減ってしまう</span>
+
+<span class="dim">// その特例リストに逃げけん制のIDが含まれる</span>
+... <span class="hi">200831</span>, 200861, 200891, 200921 ...</div>
+            <p class="ev-note">
+              「5秒未満になり得る地点も抽選される」前提でないと、このコメントの意味が通りません。
+              反論「最初から5秒以降だけ抽選しているのでは？」への強い反証です。
+            </p>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="faq" class="faq">
+      <div class="panel">
+        <h2 style="margin-top:0">よくある疑問 / 想定反論</h2>
+
+        <details open>
+          <summary>③があるなら、最初から5秒以降だけ抽選してるのでは？</summary>
+          <p>
+            もしそうなら、地点到達時に③はほぼ常に真になり、条件文に書く必要が薄くなります。
+            実際には③が残っており、公開資料・シミュ実装も
+            「地点を先に決め、通過時に秒数を見る」前提です。
+            さらにシミュ作者は「早期地点を除外すると本家より不発が減る」と明記し、
+            逃げけん制（200831）をその対象に入れています。
+          </p>
+        </details>
+
+        <details>
+          <summary>逃げが4人いるのに、なぜ①以外で落ちるの？</summary>
+          <p>
+            ①は人数条件だけです。判定は「その1点」で行われ、
+            その瞬間に③（5秒）を満たしていなければ条件不成立になります。
+            後から5秒を超えても、判定地点は過ぎているので取り直しません。
+          </p>
+        </details>
+
+        <details>
+          <summary>距離が足りなかった、という説は？</summary>
+          <p>
+            今回の正本条件には、逃げとの距離・先頭との距離といった記述はありません。
+            少なくとも master.mdb 上の逃げけん制条件としては、距離説は支持されません。
+          </p>
+        </details>
+
+        <details>
+          <summary>U-toolsの説明と違うのはなぜ？</summary>
+          <p>
+            ツール側は読みやすさのために条件を要約していることがあります。
+            「逃げがいれば」は①の要約に近く、②③まで書いていない場合があります。
+            厳密な正本は master.mdb の condition 文です。
+          </p>
+        </details>
+      </div>
+    </section>
+
+    <section id="sources" class="sources">
+      <div class="panel">
+        <h2 style="margin-top:0">参照・再現方法</h2>
+        <ul>
+          <li>正本：PC版 <code>master.mdb</code> → テーブル <code>skill_data</code> / <code>text_data</code></li>
+          <li>解析ドキュメント：
+            <a href="https://github.com/TheCing/uma-tools/blob/dev/docs/Uma%20Musume%20Race%20Mechanics.md" target="_blank" rel="noopener">Uma Musume Race Mechanics</a>
+          </li>
+          <li>条件解説：
+            <a href="https://www.umareference.com/guide/skills/conditions-1" target="_blank" rel="noopener">umareference Conditions</a>
+            ／
+            <a href="https://umagui.de/guide-content/Uma_Basics/Skills.html" target="_blank" rel="noopener">UmaGuide Skills</a>
+          </li>
+          <li>シミュ実装：
+            <a href="https://github.com/alpha123/uma-skill-tools" target="_blank" rel="noopener">alpha123/uma-skill-tools</a>
+            （ActivationConditions.ts の accumulatetime / phase_random 周辺）
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <footer>
+      このHTMLは掲示板添付用の調査メモです。ゲーム公式のヘルプ文言ではなく、
+      master.mdb とコミュニティ公開資料に基づく整理です。<br>
+      作成日：2026-07-28
+    </footer>
+  </div>
+</body>
+</html>
